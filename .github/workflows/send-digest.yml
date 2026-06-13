@@ -2,6 +2,7 @@ name: Send Daily Digest
 
 on:
   schedule:
+    # Every day at UTC 0:00 (Beijing 8:00)
     - cron: '0 0 * * *'
   workflow_dispatch:
 
@@ -21,17 +22,39 @@ jobs:
       - name: Install dependencies
         run: cd scripts && npm install
 
-      - name: Run prepare-digest and remix with Gemini
+      - name: Create config for Actions environment
+        run: |
+          mkdir -p ~/.follow-builders
+          cat > ~/.follow-builders/config.json << 'CFGEOF'
+          {
+            "platform": "other",
+            "language": "zh",
+            "timezone": "Asia/Shanghai",
+            "frequency": "daily",
+            "delivery": {
+              "method": "email",
+              "email": "${{ secrets.DIGEST_EMAIL }}"
+            },
+            "onboardingComplete": true
+          }
+          CFGEOF
+
+      - name: Run prepare-digest
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           DIGEST_LANGUAGE: zh
-          DIGEST_EMAIL: ${{ secrets.DIGEST_EMAIL }}
         run: |
           cd scripts
-          node prepare-digest.js 2>/dev/null > /tmp/digest-data.json
-          node remix-digest.js /tmp/digest-data.json > /tmp/digest-text.txt 2>/dev/null
-          echo "Remix done, length: $(wc -c < /tmp/digest-text.txt)"
+          node prepare-digest.js > /tmp/digest-data.json
+          echo "Prepare done, size: $(wc -c < /tmp/digest-data.json) bytes"
+
+      - name: Remix with Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DIGEST_LANGUAGE: zh
+        run: |
+          cd scripts
+          node remix-digest.js /tmp/digest-data.json > /tmp/digest-text.txt
+          echo "Remix done, size: $(wc -c < /tmp/digest-text.txt) bytes"
 
       - name: Send via Resend
         if: success()
