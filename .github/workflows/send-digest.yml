@@ -47,13 +47,14 @@ jobs:
           node prepare-digest.js > /tmp/digest-data.json
           echo "Prepare done, size: $(wc -c < /tmp/digest-data.json) bytes"
 
-      - name: Format digest (no AI needed)
+      - name: Remix with Gemini (AI-powered digest)
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DIGEST_LANGUAGE: zh
         run: |
           cd scripts
-          node format-digest.js /tmp/digest-data.json > /tmp/digest-text.txt
-          echo "Format done, size: $(wc -c < /tmp/digest-text.txt) bytes"
+          node remix-digest.js /tmp/digest-data.json > /tmp/digest-text.txt
+          echo "Remix done, size: $(wc -c < /tmp/digest-text.txt) bytes"
 
       - name: Send via Resend
         if: success()
