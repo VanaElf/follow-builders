@@ -2,7 +2,6 @@ name: Send Daily Digest
 
 on:
   schedule:
-    # Every day at UTC 0:00 (Beijing 8:00)
     - cron: '0 0 * * *'
   workflow_dispatch:
 
@@ -47,14 +46,13 @@ jobs:
           node prepare-digest.js > /tmp/digest-data.json
           echo "Prepare done, size: $(wc -c < /tmp/digest-data.json) bytes"
 
-      - name: Remix with Gemini (AI-powered digest)
+      - name: Format digest (no AI)
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DIGEST_LANGUAGE: zh
         run: |
           cd scripts
-          node remix-digest.js /tmp/digest-data.json > /tmp/digest-text.txt
-          echo "Remix done, size: $(wc -c < /tmp/digest-text.txt) bytes"
+          node format-digest.js /tmp/digest-data.json > /tmp/digest-text.txt
+          echo "Format done, size: $(wc -c < /tmp/digest-text.txt) bytes"
 
       - name: Send via Resend
         if: success()
