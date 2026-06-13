@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// Follow Builders — Delivery Script
+// Follow Builders — Delivery Script (with HTML email support)
 // ============================================================================
 // Sends a digest to the user via their chosen delivery method.
 // Supports: Telegram bot, Email (via Resend), or stdout (default).
@@ -124,23 +124,51 @@ async function sendTelegram(text, botToken, chatId) {
 
 // -- Email Delivery (Resend) -------------------------------------------------
 
-// Sends the digest via Resend's email API.
-// The user provides their own Resend API key and email address.
+// Detects if content is HTML and sends accordingly.
+// If the content starts with <!DOCTYPE or <html, it's treated as HTML.
+function isHtmlContent(text) {
+  const trimmed = text.trimStart();
+  return trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML');
+}
+
+// Generates a plain text fallback from HTML by stripping tags.
+function htmlToPlainText(html) {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 async function sendEmail(text, apiKey, toEmail) {
+  const htmlMode = isHtmlContent(text);
+  const emailPayload = {
+    from: 'AI Builders Digest <digest@resend.dev>',
+    to: [toEmail],
+    subject: `AI Builders Digest — ${new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    })}`,
+  };
+
+  if (htmlMode) {
+    emailPayload.html = text;
+    emailPayload.text = htmlToPlainText(text);
+  } else {
+    emailPayload.text = text;
+  }
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      from: 'AI Builders Digest <digest@resend.dev>',
-      to: [toEmail],
-      subject: `AI Builders Digest — ${new Date().toLocaleDateString('en-US', {
-        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-      })}`,
-      text: text
-    })
+    body: JSON.stringify(emailPayload)
   });
 
   if (!res.ok) {
